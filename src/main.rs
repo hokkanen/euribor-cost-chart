@@ -91,7 +91,7 @@ fn calculate_average_rates(all_rates: &AllEuriborRates, averaged_time_days: i64)
         &all_rates.w01, &all_rates.m01, &all_rates.m03,
         &all_rates.m06, &all_rates.m12
     ];
-    let periods = [7, 30, 90, 180, 360];
+    let periods = [7, 30, 90, 180, 365];
 
     let start_date = rates_vec.iter()
         .filter_map(|r| r.first())
@@ -118,20 +118,21 @@ fn calculate_average_rates(all_rates: &AllEuriborRates, averaged_time_days: i64)
         for i in 0..NUM_RATES {
             let period = periods[i];
             let mut sum = 0.0;
-            let mut count = 0;
+            let mut total_days = 0;
             let mut check_date = current_date;
             let days_left = (end_date - current_date).num_days() + 1;
             let check_period = std::cmp::min(averaged_time_days, days_left as i64);
 
             while check_date <= current_date + Duration::days(check_period - 1) {
                 if let Some(&rate) = rate_maps[i].get(&check_date) {
-                    sum += rate;
-                    count += 1;
+                    let days_in_period = std::cmp::min(period, (end_date - check_date).num_days() as i64 + 1);
+                    sum += rate * days_in_period as f64;
+                    total_days += days_in_period;
                 }
                 check_date += Duration::days(period);
             }
 
-            avg_rates[i] = if count > 0 { sum / count as f64 } else { 0.0 };
+            avg_rates[i] = if total_days > 0 { sum / total_days as f64 } else { 0.0 };
         }
 
         averages.push(avg_rates);
@@ -199,13 +200,13 @@ fn create_chart_data(all_rates: &AllEuriborRates, averages: &[[f64; NUM_RATES]],
         "y": [0, max_rate],
         "type": "scatter",
         "mode": "lines",
-        "name": "One year of forward data",
+        "name": "Full forward data end point",
         "line": {
             "color": "gray",
             "width": 1,
             "dash": "dash"
         },
-        "showlegend": false
+        "showlegend": true
     });
     traces.push(vertical_line);
 
