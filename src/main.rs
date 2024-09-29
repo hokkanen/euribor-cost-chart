@@ -91,7 +91,7 @@ fn calculate_average_rates(all_rates: &AllEuriborRates, averaged_time_days: i64)
         &all_rates.w01, &all_rates.m01, &all_rates.m03,
         &all_rates.m06, &all_rates.m12
     ];
-    let periods = [7, 30, 90, 180, 365];
+    let periods = [7, 30, 90, 180, 360];
 
     let start_date = rates_vec.iter()
         .filter_map(|r| r.first())
