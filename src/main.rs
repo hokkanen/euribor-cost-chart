@@ -23,6 +23,7 @@ use std::fs::File;
 use std::io::Write;
 
 const NUM_RATES: usize = 5;
+const ANNUAL_MONETARY_DISCOUNT_RATE: f64 = 0.08;
 
 #[derive(Debug, Clone)]
 struct EuriborRate {
@@ -117,22 +118,24 @@ fn calculate_average_rates(all_rates: &AllEuriborRates, averaged_time_days: i64)
 
         for i in 0..NUM_RATES {
             let period = periods[i];
-            let mut sum = 0.0;
-            let mut total_days = 0;
-            let mut check_date = current_date;
             let days_left = (end_date - current_date).num_days() + 1;
             let check_period = std::cmp::min(averaged_time_days, days_left as i64);
+            let mut check_date = current_date;
+            let mut total_weight = 0.0;
+            let mut weighted_sum = 0.0;
 
             while check_date <= current_date + Duration::days(check_period - 1) {
                 if let Some(&rate) = rate_maps[i].get(&check_date) {
                     let days_in_period = std::cmp::min(period, (end_date - check_date).num_days() as i64 + 1);
-                    sum += rate * days_in_period as f64;
-                    total_days += days_in_period;
+                    let days_from_start = (check_date - current_date).num_days() as f64;
+                    let weight = (1.0 - ANNUAL_MONETARY_DISCOUNT_RATE).powf(days_from_start / 360.0);
+                    total_weight += weight * days_in_period as f64;
+                    weighted_sum += rate * weight * days_in_period as f64;
                 }
                 check_date += Duration::days(period);
             }
 
-            avg_rates[i] = if total_days > 0 { sum / total_days as f64 } else { 0.0 };
+            avg_rates[i] = if total_weight > 0.0 { weighted_sum / total_weight } else { 0.0 };
         }
 
         averages.push(avg_rates);
@@ -230,7 +233,7 @@ fn generate_html(chart_data: &serde_json::Value, averaged_time_days: i64) -> Str
     <script>
         var data = {0};
         var layout = {{
-            title: 'Euribor rates\' {1}-day forward realized cost (average interest rate)',
+            title: 'Euribor rates\' {1}-day forward realized cost (average interest rate) with {2:.2}% annual monetary discount rate',
             showlegend: true,
             xaxis: {{ 
                 title: 'Date', 
@@ -252,7 +255,7 @@ fn generate_html(chart_data: &serde_json::Value, averaged_time_days: i64) -> Str
     </script>
 </body>
 </html>
-    "#, chart_data, averaged_time_days)
+    "#, chart_data, averaged_time_days, ANNUAL_MONETARY_DISCOUNT_RATE * 100.0)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
